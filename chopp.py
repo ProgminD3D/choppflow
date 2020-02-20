@@ -1,38 +1,42 @@
 import RPi.GPIO as GPIO 
 import time
-GPIO.setmode(GPIO.BOARD) 
-GPIO.setup(16, GPIO.IN, pull_up_down=GPIO.PUD_DOWN) 
-#pulsos_por_minuto = 0
-#tot_pulsos = 0
-#constante = 0.10 / 60
-#tempo_novo = 0.0
+import threading
 
-count = 0
-start_counter = False
-total = 0
-def countPulse(channel):
-    global count
-    if start_counter:
-        count += 1
 
-GPIO.add_event_detect(16, GPIO.FALLING, callback=countPulse)
+class ChoppFlow(threading.Thread):
+    def __init__(self, pin):
+         threading.Thread.__init__(self)
+         self.pin = pin
+         self.start_counter = False
+         self.is_running = False
+         self.count = 0
+         self.total = 0
+         self.flow = 0
 
-try:
-    while True:
-        start_counter = True
-        time.sleep(1)
-        # print(GPIO.input(16))
-        start_counter = False
-        flow = (count  * 2.25) / 1000
-        count = 0
-        total += 1.035 * flow
-        print(f"{time.time()} {flow} {total}")
-        #print("Litros por minuto",round(pulsos_por_minuto * constante,2)) 
-        #print("Total de Litros",round(tot_pulsos * constante,2))
-except KeyboardInterrupt:
-    print('Bye')
-except:
-    pass
+    def config(self):
+         GPIO.setmode(GPIO.BOARD)
+         GPIO.setup(self.pin, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
+         GPIO.add_event_detect(self.pin, GPIO.FALLING, callback=self.count_pulse)
 
-GPIO.cleanup()
+    def count_pulse(self):
+         if self.start_counter:
+             self.count += 1
+
+    def run(self):
+         self.config()
+         self.is_running = True
+         while self.is_running:
+             self.start_counter = True
+             time.sleep(0.5)
+             self.start_counter = False
+             self.flow = (self.count * 2.25) / 500
+             self.count = 0
+             self.total += 1.03 * self.flow
+
+    def stop(self):
+         self.is_running = False
+         self.join()
+         GPIO.cleanup()
+
+
 
