@@ -36,11 +36,17 @@ async def add_user():
         return resp
     
     if not request.is_json:
-        return jsonify({'error': 'data should be in json'}), 400
+        resp = jsonify({'error': 'data should be in json'})
+        resp.status_code = 400
+        add_cors(resp)
+        return resp
 
     data = await request.get_json()
     if 'name' not in data:
-        return jsonify({'error': 'name field not found'}), 400
+        resp = jsonify({'error': 'name field not found'})
+        resp.status_code = 400
+        add_cors(resp)
+        return resp
 
     user = {
         'id': len(chopp_flow.consumers),
@@ -63,11 +69,18 @@ async def select_user(user_id):
         return resp
 
     if user_id > (len(chopp_flow.consumers) - 1):
-        return jsonify({'error': f'invalid id {user_id}'}), 404
+        resp = jsonify({'error': f'invalid id {user_id}'})
+        resp.status_code = 404
+        add_cors(resp)
+        return resp
 
     # Select new user
-    for user in chopp_flow.consumers:
-        user['selected'] = user['id'] == user_id
+    last_id = chopp_flow.selected_user
+    if last_id != -1:
+        chopp_flow.consumers[last_id]['selected'] = False
+    # Select user
+    chopp_flow.consumers[user_id]['selected'] = True
+    chopp_flow.selected_user = user_id
 
     resp = jsonify(chopp_flow.consumers[user_id])
     resp.status_code = 200
@@ -78,25 +91,31 @@ async def select_user(user_id):
 # Route for reset
 @app.route('/reset', methods=['POST', 'OPTIONS'])
 async def reset_all():
+    global chopp_flow
     if request.method == 'OPTIONS':
         resp = Response('')
         add_cors(resp)
         return resp
 
     if not request.is_json:
-        return jsonify({'error': 'data should be in json'}), 400
+        resp = jsonify({'error': 'data should be in json'})
+        resp.status_code = 400
+        add_cors(resp)
+        return resp
 
     data = await request.get_json()
     if 'total' not in data:
-        return jsonify({'error': 'total field not found'}), 400
+        resp = jsonify({'error': 'total field not found'})
+        resp.status_code = 400
+        add_cors(resp)
+        return resp
 
     chopp_flow.stop()
-    
-    chopp_flow.consumers = []
-    chopp_flow.consumed = 0
-    chopp_flow.total = data['total']
-    
+    # We cannot restart a stopped thread
+    # So we create another object
+    chopp_flow = chopp.ChoppFlow(16)
     chopp_flow.start()
+    chopp_flow.total = data['total']
 
     resp = jsonify(chopp_flow.to_json())
     resp.status_code = 200
